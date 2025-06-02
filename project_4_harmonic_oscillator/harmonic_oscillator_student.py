@@ -20,7 +20,7 @@ def harmonic_oscillator_ode(state: np.ndarray, t: float, omega: float = 1.0) -> 
     # dv/dt = -omega^2 * x
     dx_dt = v
     dv_dt = -(omega**2)*x
-    return np.array(dx_dt,dv_dt)
+    return np.array([dx_dt,dv_dt])
     
 
 def anharmonic_oscillator_ode(state: np.ndarray, t: float, omega: float = 1.0) -> np.ndarray:
@@ -156,15 +156,11 @@ def analyze_period(t: np.ndarray, states: np.ndarray) -> float:
     zero_crossings = np.where(np.diff(np.sign(x)) < 0)[0]
     # 需要至少两个过零点才能计算周期
     if len(zero_crossings) < 2:
-        print("警告：数据不足，无法计算周期")
         return 0.0
-    # 计算连续过零点之间的时间差
+    # 计算连续过零点之间的时间差（这已经是一个完整周期）
     periods = np.diff(t[zero_crossings])
-    # 计算平均周期（跳过前两个瞬态周期）
-    if len(periods) > 2:
-        avg_period = np.mean(periods[1:]) * 2  # 乘以2因为相邻过零点间隔是半个周期
-    else:
-        avg_period = np.mean(periods) * 2
+    # 计算平均周期
+    avg_period = np.mean(periods)
     return avg_period
 
 def main():
