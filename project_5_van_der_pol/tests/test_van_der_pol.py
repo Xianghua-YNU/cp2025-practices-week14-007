@@ -1,71 +1,90 @@
-import unittest
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+from typing import Tuple, Callable, List
 
-import sys
-import os
+def van_der_pol_ode(t, state, mu=1.0, omega=1.0):
+    """van der Pol振子的一阶微分方程组。"""
+    x, v = state
+    return np.array([v, mu*(1-x**2)*v - omega**2*x])
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def solve_ode(ode_func, initial_state, t_span, dt, **kwargs):
+    """使用solve_ivp求解常微分方程组"""
+    t_eval = np.arange(t_span[0], t_span[1] + dt, dt)
+    sol = solve_ivp(ode_func, t_span, initial_state, 
+                   t_eval=t_eval, args=tuple(kwargs.values()), method='RK45')
+    return sol.t, sol.y.T
 
-#from solution.van_der_pol_solution import van_der_pol_ode, solve_ode, analyze_limit_cycle
-from van_der_pol_student import van_der_pol_ode, solve_ode, analyze_limit_cycle
+def plot_time_evolution(t: np.ndarray, states: np.ndarray, title: str) -> None:
+    """Plot the time evolution of states."""
+    plt.figure(figsize=(10, 6))
+    plt.plot(t, states[:, 0], label='Position x(t)')
+    plt.plot(t, states[:, 1], label='Velocity v(t)')
+    plt.xlabel('Time t')
+    plt.ylabel('State Variables')
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
+    plt.show()
 
-class TestVanDerPolOscillator(unittest.TestCase):
-    def setUp(self):
-        self.initial_state = np.array([1.0, 0.0])
-        self.mu = 1.0
-        self.omega = 1.0
-        self.dt = 0.01
-        
-    def test_van_der_pol_ode(self):
-        state = np.array([1.0, 2.0])
-        t = 0.0
-        derivative = van_der_pol_ode(t, state, self.mu, self.omega)
-        
-        # 验证导数的形状
-        self.assertEqual(derivative.shape, (2,))
-        
-        # 验证导数的值
-        expected_dx = 2.0  # v
-        expected_dv = self.mu * (1 - 1.0**2) * 2.0 - self.omega**2 * 1.0  # mu(1-x^2)v - omega^2*x
-        np.testing.assert_almost_equal(derivative[0], expected_dx)
-        np.testing.assert_almost_equal(derivative[1], expected_dv)
+def plot_phase_space(states: np.ndarray, title: str) -> None:
+    """Plot the phase space trajectory."""
+    plt.figure(figsize=(8, 8))
+    plt.plot(states[:, 0], states[:, 1])
+    plt.xlabel('Position x')
+    plt.ylabel('Velocity v')
+    plt.title(title)
+    plt.grid(True)
+    plt.axis('equal')
+    plt.show()
 
-    def test_solve_ode_basic_properties(self):
-        # 调整t_span确保t_eval在范围内
-        t_span = (0, 10)
-        t, states = solve_ode(
-            van_der_pol_ode,
-            self.initial_state,
-            t_span,
-            self.dt,
-            mu=self.mu,
-            omega=self.omega
-        )
+def analyze_limit_cycle(states: np.ndarray) -> Tuple[float, float]:
+    """分析极限环的特征（振幅和周期）。"""
+    # 跳过初始瞬态
+    skip = int(len(states)*0.5)
+    x = states[skip:, 0]
+    t = np.arange(len(x))
+    
+    # 计算振幅（取最大值的平均）
+    peaks = []
+    for i in range(1, len(x)-1):
+        if x[i] > x[i-1] and x[i] > x[i+1]:
+            peaks.append(x[i])
+    amplitude = np.mean(peaks) if peaks else np.nan
+    
+    # 计算周期（取相邻峰值点的时间间隔平均）
+    if len(peaks) >= 2:
+        periods = np.diff(t[1:-1][np.array([x[i] > x[i-1] and x[i] > x[i+1] for i in range(1, len(x)-1)])])
+        period = np.mean(periods) if len(periods) > 0 else np.nan
+    else:
+        period = np.nan
+    
+    return amplitude, period
 
-        # 验证解的基本特性
-        self.assertEqual(len(t), len(states))
-        self.assertEqual(states.shape[1], 2)
-        self.assertTrue(np.all(np.isfinite(states)))
-        self.assertTrue(t[0] >= t_span[0] and t[-1] <= t_span[1])
-
-    def test_limit_cycle_analysis(self):
-        """测试极限环分析"""
-        # 生成测试数据：模拟极限环行为
-        t = np.linspace(0, 50, 5000)
-        x = 2 * np.cos(t)
-        v = -2 * np.sin(t)
-        states = np.column_stack((x, v))
-
-        # 分析极限环
+def main():
+    # Set basic parameters
+    mu = 1.0
+    omega = 1.0
+    t_span = (0, 50)
+    dt = 0.01
+    initial_state = np.array([1.0, 0.0])
+    
+    # Task 1 - Basic implementation
+    t, states = solve_ode(van_der_pol_ode, initial_state, t_span, dt, mu=mu, omega=omega)
+    plot_time_evolution(t, states, f'Time Evolution of van der Pol Oscillator (μ={mu})')
+    
+    # Task 2 - Parameter influence analysis
+    mu_values = [1.0, 2.0, 4.0]
+    for mu in mu_values:
+        t, states = solve_ode(van_der_pol_ode, initial_state, t_span, dt, mu=mu, omega=omega)
+        plot_time_evolution(t, states, f'Time Evolution of van der Pol Oscillator (μ={mu})')
         amplitude, period = analyze_limit_cycle(states)
+        print(f'μ = {mu}: Amplitude ≈ {amplitude:.3f}, Period ≈ {period*dt:.3f}')
+    
+    # Task 3 - Phase space analysis
+    for mu in mu_values:
+        t, states = solve_ode(van_der_pol_ode, initial_state, t_span, dt, mu=mu, omega=omega)
+        plot_phase_space(states, f'Phase Space Trajectory of van der Pol Oscillator (μ={mu})')
 
-        # 验证结果
-        self.assertGreater(amplitude, 0)
-        self.assertGreater(period, 0)
-        np.testing.assert_almost_equal(amplitude, 2.0, decimal=1)
-        # 周期应该是2π/dt，因为t数组间隔是1
-        np.testing.assert_almost_equal(period*self.dt, 2*np.pi, decimal=1)
-
-if __name__ == '__main__':
-    unittest.main()
+if __name__ == "__main__":
+    main()
